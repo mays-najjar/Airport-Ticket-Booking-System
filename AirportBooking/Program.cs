@@ -1,0 +1,319 @@
+﻿
+using AirportBooking.Models;
+using AirportBooking.Repositories;
+using AirportBooking.Services;
+using AirportBooking.UI;
+
+namespace Airport_Ticket_Booking;
+
+class Program
+{
+    private static FlightService _flightService = null!;
+    private static PassengerService _passengerService = null!;
+    private static BookingService _bookingService = null!;
+    private static CsvImportService _csvImportService = null!;
+
+    static async Task Main(string[] args)
+    {
+        Console.OutputEncoding = System.Text.Encoding.UTF8;
+        
+        InitializeServices();
+        await ShowWelcomeScreen();
+    }
+
+    private static void InitializeServices()
+    {
+        var flightRepository = new FileRepository<Flight>("flights");
+        var passengerRepository = new FileRepository<Passenger>("passengers");
+        var bookingRepository = new FileRepository<Booking>("bookings");
+
+        _flightService = new FlightService(flightRepository);
+        _passengerService = new PassengerService(passengerRepository);
+        _bookingService = new BookingService(bookingRepository, _flightService, _passengerService);
+        _csvImportService = new CsvImportService(_flightService);
+    }
+
+    private static async Task ShowWelcomeScreen()
+    {
+        while (true)
+        {
+            ConsoleHelper.PrintHeader("Airport Ticket Booking System");
+            Console.WriteLine("Welcome to the Airport Ticket Booking System!");
+            Console.WriteLine();
+            Console.WriteLine("Please select your role:");
+            Console.WriteLine();
+            Console.WriteLine("1. Passenger");
+            Console.WriteLine("2. Manager");
+            Console.WriteLine("3. Exit");
+            Console.WriteLine();
+
+            var choice = ConsoleHelper.GetMenuChoice(3);
+
+            switch (choice)
+            {
+                case 1:
+                    await ShowPassengerMenu();
+                    break;
+                case 2:
+                    await ShowManagerMenu();
+                    break;
+                case 3:
+                    ConsoleHelper.PrintInfo("Thank you for using the Airport Ticket Booking System. Goodbye!");
+                    return;
+            }
+        }
+    }
+
+    private static async Task ShowPassengerMenu()
+    {
+        while (true)
+        {
+            ConsoleHelper.PrintHeader("Passenger Menu");
+            ConsoleHelper.DisplayMenu(new[]
+            {
+                "Search Flights",
+                "Book a Flight",
+                "Manage Bookings",
+                "Back to Main Menu"
+            });
+
+            var choice = ConsoleHelper.GetMenuChoice(4);
+
+            switch (choice)
+            {
+                case 1:
+                    await SearchFlights();
+                    break;
+                case 2:
+                    await BookFlight();
+                    break;
+                case 3:
+                    await ManageBookings();
+                    break;
+                case 4:
+                    return;
+            }
+        }
+    }
+
+    private static async Task ShowManagerMenu()
+    {
+        while (true)
+        {
+            ConsoleHelper.PrintHeader("Manager Menu");
+            ConsoleHelper.DisplayMenu(new[]
+            {
+                "Filter Bookings",
+                "Batch Flight Upload (CSV)",
+                "View Flight Data Validation Details",
+                "Back to Main Menu"
+            });
+
+            var choice = ConsoleHelper.GetMenuChoice(4);
+
+            switch (choice)
+            {
+                case 1:
+                    await FilterBookings();
+                    break;
+                case 2:
+                    await BatchFlightUpload();
+                    break;
+                case 3:
+                    ViewValidationDetails();
+                    break;
+                case 4:
+                    return;
+            }
+        }
+    }
+
+    private static async Task SearchFlights()
+    {
+        ConsoleHelper.PrintHeader("Search Flights");
+
+        var departureCountry = ConsoleHelper.GetStringInput("Departure Country (leave blank to skip): ", false);
+        var destinationCountry = ConsoleHelper.GetStringInput("Destination Country (leave blank to skip): ", false);
+        var departureDate = ConsoleHelper.GetDateTimeInput("Departure Date (yyyy-MM-dd HH:mm): ");
+        var maxPrice = ConsoleHelper.GetDecimalInput("Max Price (leave blank to skip): ", 0);
+
+        var flights = await _flightService.SearchFlightsAsync(
+            departureCountry: string.IsNullOrWhiteSpace(departureCountry) ? null : departureCountry,
+            destinationCountry: string.IsNullOrWhiteSpace(destinationCountry) ? null : destinationCountry,
+            departureDate: departureDate,
+            maxPrice: maxPrice == 0 ? null : maxPrice
+        );
+
+        if (!flights.Any())
+        {
+            ConsoleHelper.PrintWarning("No flights found matching your criteria.");
+            ConsoleHelper.Pause();
+            return;
+        }
+
+        ConsoleHelper.PrintSuccess($"Found {flights.Count()} flights:");
+        foreach (var flight in flights)
+        {
+            Console.WriteLine($"{flight.Id}: {flight}");
+        }
+
+        ConsoleHelper.Pause();
+    }
+
+    private static async Task BookFlight()
+    {
+        ConsoleHelper.PrintHeader("Book a Flight");
+
+        var passengerEmail = ConsoleHelper.GetStringInput("Enter your email: ");
+        var passenger = await _passengerService.GetPassengerByEmailAsync(passengerEmail);
+        if (passenger == null)
+        {
+            ConsoleHelper.PrintInfo("Passenger not found. Please enter your details to register.");
+            var name = ConsoleHelper.GetStringInput("Name: ");
+            var phone = ConsoleHelper.GetStringInput("Phone Number: ");
+            passenger = new Passenger { FirstName = name, Email = passengerEmail, PhoneNumber = phone };
+            await _passengerService.AddPassengerAsync(passenger);
+            ConsoleHelper.PrintSuccess("Passenger registered successfully.");
+        }
+
+        var flightId = ConsoleHelper.GetStringInput("Enter Flight ID to book: ");
+        var flight = await _flightService.GetFlightByIdAsync(flightId);
+        if (flight == null)
+        {
+            ConsoleHelper.PrintError("Flight not found.");
+            ConsoleHelper.Pause();
+            return;
+        }
+
+        var classInput = ConsoleHelper.GetStringInput("Select Class (Economy, Business, FirstClass): ");
+        if (!Enum.TryParse<FlightClass>(classInput, true, out var selectedClass))
+        {
+            ConsoleHelper.PrintError("Invalid class selected.");
+            ConsoleHelper.Pause();
+            return;
+        }
+
+        var seats = ConsoleHelper.GetIntInput("Number of seats to book: ", 1, flight.AvailableSeats);
+
+        var result = await _bookingService.CreateBookingAsync(flightId, passenger.Id, selectedClass, seats);
+        if (result.Success)
+        {
+            ConsoleHelper.PrintSuccess(result.Message);
+        }
+        else
+        {
+            ConsoleHelper.PrintError(result.Message);
+        }
+
+        ConsoleHelper.Pause();
+    }
+
+    private static async Task ManageBookings()
+    {
+        ConsoleHelper.PrintHeader("Manage Bookings");
+
+        var passengerEmail = ConsoleHelper.GetStringInput("Enter your email: ");
+        var passenger = await _passengerService.GetPassengerByEmailAsync(passengerEmail);
+        if (passenger == null)
+        {
+            ConsoleHelper.PrintInfo("Passenger not found. Please enter your details to register.");
+            var name = ConsoleHelper.GetStringInput("Name: ");
+            var phone = ConsoleHelper.GetStringInput("Phone Number: ");
+            passenger = new Passenger { FirstName = name, Email = passengerEmail, PhoneNumber = phone };
+            await _passengerService.AddPassengerAsync(passenger);
+            ConsoleHelper.PrintSuccess("Passenger registered successfully.");
+        }
+
+        var bookings = await _bookingService.GetBookingsByPassengerIdAsync(passenger.Id);
+        if (!bookings.Any())
+        {
+            ConsoleHelper.PrintWarning("No bookings found.");
+            ConsoleHelper.Pause();
+            return;
+        }
+
+        ConsoleHelper.PrintSuccess($"Found {bookings.Count()} bookings:");
+        foreach (var booking in bookings)
+        {
+            Console.WriteLine($"{booking.Id}: {booking}");
+        }
+
+        ConsoleHelper.Pause();
+    }
+
+    private static async Task FilterBookings()
+    {
+        ConsoleHelper.PrintHeader("Filter Bookings");
+
+        var flightId = ConsoleHelper.GetStringInput("Flight ID (leave blank to skip): ", false);
+        var passengerId = ConsoleHelper.GetStringInput("Passenger ID (leave blank to skip): ", false);
+        var departureCountry = ConsoleHelper.GetStringInput("Departure Country (leave blank to skip): ", false);
+        var destinationCountry = ConsoleHelper.GetStringInput("Destination Country (leave blank to skip): ", false);
+        var departureDate = ConsoleHelper.GetDateTimeInput("Departure Date (yyyy-MM-dd HH:mm): ");
+        var maxPrice = ConsoleHelper.GetDecimalInput("Max Price (leave blank to skip): ", 0);
+
+        var bookings = await _bookingService.SearchBookingsAsync(
+            flightId: string.IsNullOrWhiteSpace(flightId) ? null : flightId,
+            passengerId: string.IsNullOrWhiteSpace(passengerId) ? null : passengerId,
+            departureCountry: string.IsNullOrWhiteSpace(departureCountry) ? null : departureCountry,
+            destinationCountry: string.IsNullOrWhiteSpace(destinationCountry) ? null : destinationCountry,
+            departureDate: departureDate,
+            maxPrice: maxPrice == 0 ? null : maxPrice
+        );
+
+        if (!bookings.Any())
+        {
+            ConsoleHelper.PrintWarning("No bookings found matching the criteria.");
+            ConsoleHelper.Pause();
+            return;
+        }
+
+        ConsoleHelper.PrintSuccess($"Found {bookings.Count()} bookings:");
+        foreach (var booking in bookings)
+        {
+            Console.WriteLine($"{booking.Id}: {booking}");
+        }
+
+        ConsoleHelper.Pause();
+    }
+
+    private static async Task BatchFlightUpload()
+    {
+        ConsoleHelper.PrintHeader("Batch Flight Upload (CSV)");
+
+        ConsoleHelper.PrintInfo("Please enter the full path to the CSV file:");
+        var filePath = ConsoleHelper.GetStringInput("CSV file path: ");
+
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+        {
+            ConsoleHelper.PrintError("File not found.");
+            ConsoleHelper.Pause();
+            return;
+        }
+
+        var csvContent = await File.ReadAllTextAsync(filePath);
+        var result = await _csvImportService.ImportFlightsFromCsvAsync(csvContent);
+
+        if (result.IsSuccess)
+        {
+            ConsoleHelper.PrintSuccess($"Successfully imported {result.SuccessCount} flights.");
+        }
+        else
+        {
+            ConsoleHelper.PrintError("Errors occurred during import:");
+            foreach (var error in result.Errors)
+            {
+                ConsoleHelper.PrintError(error);
+            }
+        }
+
+        ConsoleHelper.Pause();
+    }
+
+    private static void ViewValidationDetails()
+    {
+        ConsoleHelper.PrintHeader("Flight Data Validation Details");
+        Console.WriteLine(CsvImportService.GetValidationDetails());
+        ConsoleHelper.Pause();
+    }
+}
