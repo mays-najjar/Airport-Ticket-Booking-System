@@ -73,7 +73,9 @@ namespace AirportBooking.Services
         public async Task<bool> IsSeatAvailableAsync(string flightId, string seatNumber)
         {
             var flight = await _flightRepository.GetById(flightId);
-            if (flight == null) return false;
+            if (flight == null) 
+               throw new KeyNotFoundException($"Flight with ID '{flightId}' was not found.");
+;
 
             return flight.AvailableSeats > 0;
         }
@@ -82,7 +84,8 @@ namespace AirportBooking.Services
         {
             var flight = await GetFlightByIdAsync(flightId);
             if (flight == null)
-                return false;
+                throw new KeyNotFoundException($"Flight with ID '{flightId}' was not found.");
+;
 
             flight.AvailableSeats -= seats;
             await _flightRepository.UpdateAsync(flight);

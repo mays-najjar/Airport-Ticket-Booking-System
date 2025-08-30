@@ -13,7 +13,7 @@ namespace AirportBooking.Services
         private readonly FlightService _flightService;
         private readonly PassengerService _passengerService;
 
-        
+
         public BookingService(
             IBookingRepository bookingRepository,
             FlightService flightService,
@@ -54,26 +54,24 @@ namespace AirportBooking.Services
             var bookings = await _bookingRepository.GetAll();
             var flights = await _flightService.GetAllFlightsAsync();
 
-            return bookings.Where(b =>
-                !b.IsCancelled &&
-                (string.IsNullOrEmpty(flightId) || b.FlightId == flightId) &&
-                (string.IsNullOrEmpty(passengerId) || b.PassengerId == passengerId) &&
-                (!maxPrice.HasValue || b.TotalPrice <= maxPrice.Value)
-            ).Where(b =>
-            {
-                var flight = flights.FirstOrDefault(f => f.FlightId == b.FlightId);
-                if (flight == null) return false;
+            var query = from b in bookings
+                        join f in flights on b.FlightId equals f.FlightId
+                        where !b.IsCancelled
+                              && (string.IsNullOrEmpty(flightId) || b.FlightId == flightId)
+                              && (string.IsNullOrEmpty(passengerId) || b.PassengerId == passengerId)
+                              && (!maxPrice.HasValue || b.TotalPrice <= maxPrice.Value)
+                              && (string.IsNullOrEmpty(departureCountry) || f.DepartureCountry.Contains(departureCountry, StringComparison.OrdinalIgnoreCase))
+                              && (string.IsNullOrEmpty(destinationCountry) || f.DestinationCountry.Contains(destinationCountry, StringComparison.OrdinalIgnoreCase))
+                              && (!departureDate.HasValue || f.DepartureDate.Date == departureDate.Value.Date)
+                              && (string.IsNullOrEmpty(departureAirport) || f.DepartureAirport.Contains(departureAirport, StringComparison.OrdinalIgnoreCase))
+                              && (string.IsNullOrEmpty(arrivalAirport) || f.ArrivalAirport.Contains(arrivalAirport, StringComparison.OrdinalIgnoreCase))
+                              && (!flightClass.HasValue || b.SelectedClass == flightClass.Value)
+                        select b;
 
-                return (string.IsNullOrEmpty(departureCountry) || flight.DepartureCountry.Contains(departureCountry, StringComparison.OrdinalIgnoreCase)) &&
-                       (string.IsNullOrEmpty(destinationCountry) || flight.DestinationCountry.Contains(destinationCountry, StringComparison.OrdinalIgnoreCase)) &&
-                       (!departureDate.HasValue || flight.DepartureDate.Date == departureDate.Value.Date) &&
-                       (string.IsNullOrEmpty(departureAirport) || flight.DepartureAirport.Contains(departureAirport, StringComparison.OrdinalIgnoreCase)) &&
-                       (string.IsNullOrEmpty(arrivalAirport) || flight.ArrivalAirport.Contains(arrivalAirport, StringComparison.OrdinalIgnoreCase)) &&
-                       (!flightClass.HasValue || b.SelectedClass == flightClass.Value);
-            });
+            return query.ToList();
         }
 
-           public async Task<BookingResult> CreateBookingAsync(string flightId, string passengerId, FlightClass flightClass, int numberOfSeats)
+        public async Task<BookingResult> CreateBookingAsync(string flightId, string passengerId, FlightClass flightClass, int numberOfSeats)
         {
             var flight = await _flightService.GetFlightByIdAsync(flightId);
             var passenger = await _passengerService.GetPassengerByIdAsync(passengerId);
@@ -127,13 +125,11 @@ namespace AirportBooking.Services
             if (flight == null)
                 return new BookingResult { Success = false, Message = "Flight not found" };
 
-            // First check if the new number of seats is available
             if (!await _flightService.IsFlightAvailableAsync(booking.FlightId, newNumberOfSeats - booking.NumberOfSeats))
             {
                 return new BookingResult { Success = false, Message = "Not enough seats available for modification" };
             }
 
-            // Reserve the additional seats first
             if (newNumberOfSeats > booking.NumberOfSeats)
             {
                 var additionalSeats = newNumberOfSeats - booking.NumberOfSeats;
@@ -143,15 +139,13 @@ namespace AirportBooking.Services
                 }
             }
 
-            // Update the booking
             booking.SelectedClass = newClass;
             var oldSeats = booking.NumberOfSeats;
             booking.NumberOfSeats = newNumberOfSeats;
             booking.TotalPrice = flight.GetPriceForClass(newClass) * newNumberOfSeats;
-            
+
             await _bookingRepository.UpdateAsync(booking);
 
-            // Release seats if we reduced the number
             if (newNumberOfSeats < oldSeats)
             {
                 var seatsToRelease = oldSeats - newNumberOfSeats;
@@ -161,11 +155,6 @@ namespace AirportBooking.Services
             return new BookingResult { Success = true, Message = "Booking modified successfully", Booking = booking };
         }
 
-        public class BookingResult
-        {
-            public bool Success { get; set; }
-            public string Message { get; set; } = string.Empty;
-            public Booking? Booking { get; set; }
-        }
+
     }
 }
