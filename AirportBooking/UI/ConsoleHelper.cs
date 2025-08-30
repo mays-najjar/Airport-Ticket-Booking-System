@@ -151,7 +151,7 @@ namespace AirportBooking.UI
             PrintSeparator();
             foreach (var b in bookings)
             {
-                Console.WriteLine($"{b.Id,-8} {b.FlightId,-10} {b.PassengerId,-15} {b.SelectedClass,-10} {b.NumberOfSeats,-6} {b.TotalPrice,-10:C} {b.BookingDate,-20:yyyy-MM-dd HH:mm}");
+                Console.WriteLine($"{b.BookingId,-8} {b.FlightId,-10} {b.PassengerId,-15} {b.SelectedClass,-10} {b.NumberOfSeats,-6} {b.TotalPrice,-10:C} {b.BookingDate,-20:yyyy-MM-dd HH:mm}");
             }
             PrintSeparator();
         }

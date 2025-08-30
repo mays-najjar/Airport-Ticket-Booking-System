@@ -8,10 +8,9 @@ namespace AirportBooking.Services
 {
     public class PassengerService
     {
-        private readonly IRepository<Passenger> _passengerRepository;
+        private readonly IPassengerRepository _passengerRepository;
 
-
-        public PassengerService(IRepository<Passenger> passengerRepository)
+        public PassengerService(IPassengerRepository passengerRepository)
         {
             _passengerRepository = passengerRepository;
         }
@@ -28,9 +27,12 @@ namespace AirportBooking.Services
 
         public async Task<Passenger?> GetPassengerByEmailAsync(string email)
         {
-            var passengers = await _passengerRepository.GetAll();
-            var trimmedEmail = email.Trim().ToLowerInvariant();
-            return passengers.FirstOrDefault(p => p.Email.Trim().ToLowerInvariant() == trimmedEmail);
+            return await _passengerRepository.GetByEmailAsync(email);
+        }
+
+        public async Task<Passenger?> GetPassengerByPhoneAsync(string phoneNumber)
+        {
+            return await _passengerRepository.GetByPhoneAsync(phoneNumber);
         }
 
         public async Task AddPassengerAsync(Passenger passenger)
@@ -42,6 +44,7 @@ namespace AirportBooking.Services
         {
             await _passengerRepository.UpdateAsync(passenger);
         }
+
 
         public async Task DeletePassengerAsync(string id)
         {

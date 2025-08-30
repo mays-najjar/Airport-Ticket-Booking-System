@@ -9,12 +9,13 @@ namespace AirportBooking.Services
 {
     public class BookingService
     {
-        private readonly IRepository<Booking> _bookingRepository;
+        private readonly IBookingRepository _bookingRepository;
         private readonly FlightService _flightService;
         private readonly PassengerService _passengerService;
 
+        
         public BookingService(
-            IRepository<Booking> bookingRepository,
+            IBookingRepository bookingRepository,
             FlightService flightService,
             PassengerService passengerService)
         {
@@ -60,7 +61,7 @@ namespace AirportBooking.Services
                 (!maxPrice.HasValue || b.TotalPrice <= maxPrice.Value)
             ).Where(b =>
             {
-                var flight = flights.FirstOrDefault(f => f.Id == b.FlightId);
+                var flight = flights.FirstOrDefault(f => f.FlightId == b.FlightId);
                 if (flight == null) return false;
 
                 return (string.IsNullOrEmpty(departureCountry) || flight.DepartureCountry.Contains(departureCountry, StringComparison.OrdinalIgnoreCase)) &&
@@ -116,7 +117,7 @@ namespace AirportBooking.Services
             return true;
         }
 
-         public async Task<BookingResult> ModifyBookingAsync(string bookingId, FlightClass newClass, int newNumberOfSeats)
+        public async Task<BookingResult> ModifyBookingAsync(string bookingId, FlightClass newClass, int newNumberOfSeats)
         {
             var booking = await GetBookingByIdAsync(bookingId);
             if (booking == null || booking.IsCancelled)
@@ -126,22 +127,37 @@ namespace AirportBooking.Services
             if (flight == null)
                 return new BookingResult { Success = false, Message = "Flight not found" };
 
-            await _flightService.ReleaseSeatsAsync(booking.FlightId, booking.NumberOfSeats);
-
-            if (!await _flightService.IsFlightAvailableAsync(booking.FlightId, newNumberOfSeats))
+            // First check if the new number of seats is available
+            if (!await _flightService.IsFlightAvailableAsync(booking.FlightId, newNumberOfSeats - booking.NumberOfSeats))
             {
-                await _flightService.ReserveSeatsAsync(booking.FlightId, booking.NumberOfSeats);
                 return new BookingResult { Success = false, Message = "Not enough seats available for modification" };
             }
-            if (!await _flightService.ReserveSeatsAsync(booking.FlightId, newNumberOfSeats))
+
+            // Reserve the additional seats first
+            if (newNumberOfSeats > booking.NumberOfSeats)
             {
-                await _flightService.ReserveSeatsAsync(booking.FlightId, booking.NumberOfSeats);
-                return new BookingResult { Success = false, Message = "Failed to reserve new seats" };
+                var additionalSeats = newNumberOfSeats - booking.NumberOfSeats;
+                if (!await _flightService.ReserveSeatsAsync(booking.FlightId, additionalSeats))
+                {
+                    return new BookingResult { Success = false, Message = "Failed to reserve additional seats" };
+                }
             }
+
+            // Update the booking
             booking.SelectedClass = newClass;
+            var oldSeats = booking.NumberOfSeats;
             booking.NumberOfSeats = newNumberOfSeats;
             booking.TotalPrice = flight.GetPriceForClass(newClass) * newNumberOfSeats;
+            
             await _bookingRepository.UpdateAsync(booking);
+
+            // Release seats if we reduced the number
+            if (newNumberOfSeats < oldSeats)
+            {
+                var seatsToRelease = oldSeats - newNumberOfSeats;
+                await _flightService.ReleaseSeatsAsync(booking.FlightId, seatsToRelease);
+            }
+
             return new BookingResult { Success = true, Message = "Booking modified successfully", Booking = booking };
         }
 

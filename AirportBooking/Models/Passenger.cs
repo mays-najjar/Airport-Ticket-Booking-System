@@ -8,7 +8,7 @@ namespace AirportBooking.Models
 {
     public class Passenger
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
+        public string PassengerId { get; set; } = Guid.NewGuid().ToString();
 
         [Required(ErrorMessage = "First name is required")]
         [StringLength(50)]

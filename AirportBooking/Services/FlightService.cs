@@ -8,9 +8,9 @@ namespace AirportBooking.Services
 {
     public class FlightService
     {
-        private readonly IRepository<Flight> _flightRepository;
+        private readonly IFlightRepository _flightRepository;
 
-        public FlightService(IRepository<Flight> flightRepository)
+        public FlightService(IFlightRepository flightRepository)
         {
             _flightRepository = flightRepository;
         }

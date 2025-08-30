@@ -16,16 +16,16 @@ class Program
     static async Task Main(string[] args)
     {
         Console.OutputEncoding = System.Text.Encoding.UTF8;
-        
+
         InitializeServices();
         await ShowWelcomeScreen();
     }
 
     private static void InitializeServices()
     {
-        var flightRepository = new FileRepository<Flight>("flights");
-        var passengerRepository = new FileRepository<Passenger>("passengers");
-        var bookingRepository = new FileRepository<Booking>("bookings");
+        var flightRepository = new FlightRepository();
+        var passengerRepository = new PassengerRepository("passengers");
+        var bookingRepository = new BookingRepository();
 
         _flightService = new FlightService(flightRepository);
         _passengerService = new PassengerService(passengerRepository);
@@ -154,7 +154,7 @@ class Program
         ConsoleHelper.PrintSuccess($"Found {flights.Count()} flights:");
         foreach (var flight in flights)
         {
-            Console.WriteLine($"{flight.Id}: {flight}");
+            Console.WriteLine($"{flight.FlightId}: {flight}");
         }
 
         ConsoleHelper.Pause();
@@ -195,7 +195,7 @@ class Program
 
         var seats = ConsoleHelper.GetIntInput("Number of seats to book: ", 1, flight.AvailableSeats);
 
-        var result = await _bookingService.CreateBookingAsync(flightId, passenger.Id, selectedClass, seats);
+        var result = await _bookingService.CreateBookingAsync(flightId, passenger.PassengerId, selectedClass, seats);
         if (result.Success)
         {
             ConsoleHelper.PrintSuccess(result.Message);
@@ -224,7 +224,7 @@ class Program
             ConsoleHelper.PrintSuccess("Passenger registered successfully.");
         }
 
-        var bookings = await _bookingService.GetBookingsByPassengerIdAsync(passenger.Id);
+        var bookings = await _bookingService.GetBookingsByPassengerIdAsync(passenger.PassengerId);
         if (!bookings.Any())
         {
             ConsoleHelper.PrintWarning("No bookings found.");
@@ -235,7 +235,7 @@ class Program
         ConsoleHelper.PrintSuccess($"Found {bookings.Count()} bookings:");
         foreach (var booking in bookings)
         {
-            Console.WriteLine($"{booking.Id}: {booking}");
+            Console.WriteLine($"{booking.BookingId}: {booking}");
         }
 
         ConsoleHelper.Pause();
@@ -271,7 +271,7 @@ class Program
         ConsoleHelper.PrintSuccess($"Found {bookings.Count()} bookings:");
         foreach (var booking in bookings)
         {
-            Console.WriteLine($"{booking.Id}: {booking}");
+            Console.WriteLine($"{booking.BookingId}: {booking}");
         }
 
         ConsoleHelper.Pause();
@@ -313,7 +313,17 @@ class Program
     private static void ViewValidationDetails()
     {
         ConsoleHelper.PrintHeader("Flight Data Validation Details");
-        Console.WriteLine(CsvImportService.GetValidationDetails());
+        Console.WriteLine("Flight Data Model Validation Details:");
+        Console.WriteLine();
+        Console.WriteLine("FlightNumber: Required, max 50 characters");
+        Console.WriteLine("DepartureCountry: Required, max 50 characters");
+        Console.WriteLine("DestinationCountry: Required, max 50 characters");
+        Console.WriteLine("DepartureDate: Required, format yyyy-MM-dd HH:mm, must be today or future");
+        Console.WriteLine("DepartureAirport: Required, max 50 characters");
+        Console.WriteLine("ArrivalAirport: Required, max 50 characters");
+        Console.WriteLine("Price: Required, positive decimal");
+        Console.WriteLine("AvailableSeats: Required, non-negative integer");
+        Console.WriteLine();
         ConsoleHelper.Pause();
     }
 }

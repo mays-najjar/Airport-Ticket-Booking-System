@@ -6,45 +6,30 @@ using AirportBooking.Models;
 
 namespace AirportBooking.Repositories
 {
-    public class PassengerRepository : IRepository<Passenger>
+    public class PassengerRepository : FileRepository<Passenger>, IPassengerRepository
     {
-        private readonly List<Passenger> _passengers = new();
+        public PassengerRepository(string filePath) : base(filePath) { }
 
-        public async Task<IEnumerable<Passenger>> GetAll()
+        public Task<Passenger?> GetByEmailAsync(string email)
         {
-            return await Task.FromResult(_passengers);
+            var passengers = GetAll();
+            var trimmedEmail = email.Trim().ToLowerInvariant();
+
+            var result = passengers.FirstOrDefault(p =>
+                p.Email?.Trim().ToLowerInvariant() == trimmedEmail);
+            
+            return Task.FromResult(result);
         }
 
-        public async Task<Passenger?> GetById(string id)
+        public Task<Passenger?> GetByPhoneAsync(string phoneNumber)
         {
-            var passenger = _passengers.FirstOrDefault(p => p.Id == id);
-            return await Task.FromResult(passenger);
-        }
+            var passengers = GetAll();
+            var trimmedPhone = phoneNumber.Trim();
 
-        public async Task AddAsync(Passenger passenger)
-        {
-            _passengers.Add(passenger);
-            await Task.CompletedTask;
-        }
-
-        public async Task UpdateAsync(Passenger passenger)
-        {
-            var index = _passengers.FindIndex(p => p.Id == passenger.Id);
-            if (index >= 0)
-            {
-                _passengers[index] = passenger;
-            }
-            await Task.CompletedTask;
-        }
-
-        public async Task DeleteAsync(string id)
-        {
-            var passenger = _passengers.FirstOrDefault(p => p.Id == id);
-            if (passenger != null)
-            {
-                _passengers.Remove(passenger);
-            }
-            await Task.CompletedTask;
+            var result = passengers.FirstOrDefault(p =>
+                p.PhoneNumber?.Trim() == trimmedPhone);
+            
+            return Task.FromResult(result);
         }
     }
 }

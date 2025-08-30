@@ -8,7 +8,7 @@ namespace AirportBooking.Models
 {
     public class Booking
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
+        public string BookingId { get; set; } = Guid.NewGuid().ToString();
 
         [Required(ErrorMessage = "Passenger ID is required")]
         public string PassengerId { get; set; } = string.Empty;
@@ -36,7 +36,7 @@ namespace AirportBooking.Models
         public override string ToString()
         {
             string status = IsCancelled ? "Cancelled" : "Active";
-            return $"Booking ID: {Id} | Passenger ID: {PassengerId} | Flight ID: {FlightId} | Class: {SelectedClass} | Seats: {NumberOfSeats} | Total: ${TotalPrice} | Status: {status}";
+            return $"Booking ID: {BookingId} | Passenger ID: {PassengerId} | Flight ID: {FlightId} | Class: {SelectedClass} | Seats: {NumberOfSeats} | Total: ${TotalPrice} | Status: {status}";
         }
     }
 }
