@@ -41,26 +41,24 @@ namespace AirportBooking.Services
         }
 
         public async Task<IEnumerable<Flight>> SearchFlightsAsync(
-        string? departureCountry = null,
-        string? destinationCountry = null,
-        DateTime? departureDate = null,
-        string? departureAirport = null,
-        string? arrivalAirport = null,
-        decimal? maxPrice = null,
-        FlightClass? flightClass = null)
-    {
-        var flights = await _flightRepository.GetAll();
-        
-        return flights.Where(f =>
-            (string.IsNullOrEmpty(departureCountry) || f.DepartureCountry.Contains(departureCountry, StringComparison.OrdinalIgnoreCase)) &&
-            (string.IsNullOrEmpty(destinationCountry) || f.DestinationCountry.Contains(destinationCountry, StringComparison.OrdinalIgnoreCase)) &&
-            (!departureDate.HasValue || f.DepartureDate.Date == departureDate.Value.Date) &&
-            (string.IsNullOrEmpty(departureAirport) || f.DepartureAirport.Contains(departureAirport, StringComparison.OrdinalIgnoreCase)) &&
-            (string.IsNullOrEmpty(arrivalAirport) || f.ArrivalAirport.Contains(arrivalAirport, StringComparison.OrdinalIgnoreCase)) &&
-            (!maxPrice.HasValue || f.Price <= maxPrice.Value) &&
-            f.AvailableSeats > 0
-        );
-    }
+            string? departureCountry = null,
+            string? destinationCountry = null,
+            DateTime? departureDate = null,
+            string? departureAirport = null,
+            string? arrivalAirport = null,
+            decimal? maxPrice = null,
+            FlightClass? flightClass = null)
+        {
+            return await _flightRepository.SearchFlightsAsync(
+                departureCountry,
+                destinationCountry,
+                departureDate,
+                departureAirport,
+                arrivalAirport,
+                maxPrice,
+                flightClass
+                );
+        }
 
 
 
@@ -73,9 +71,9 @@ namespace AirportBooking.Services
         public async Task<bool> IsSeatAvailableAsync(string flightId, string seatNumber)
         {
             var flight = await _flightRepository.GetById(flightId);
-            if (flight == null) 
-               throw new KeyNotFoundException($"Flight with ID '{flightId}' was not found.");
-;
+            if (flight == null)
+                throw new KeyNotFoundException($"Flight with ID '{flightId}' was not found.");
+            ;
 
             return flight.AvailableSeats > 0;
         }
@@ -85,7 +83,7 @@ namespace AirportBooking.Services
             var flight = await GetFlightByIdAsync(flightId);
             if (flight == null)
                 throw new KeyNotFoundException($"Flight with ID '{flightId}' was not found.");
-;
+            ;
 
             flight.AvailableSeats -= seats;
             await _flightRepository.UpdateAsync(flight);
@@ -96,7 +94,8 @@ namespace AirportBooking.Services
         {
             var flight = await GetFlightByIdAsync(flightId);
             if (flight == null)
-                return;
+                throw new KeyNotFoundException($"Flight with ID '{flightId}' was not found.");
+            ;
 
             flight.AvailableSeats += seats;
             await _flightRepository.UpdateAsync(flight);
