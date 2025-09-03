@@ -71,12 +71,7 @@ namespace AirportBooking.Services
             var passenger = await _passengerService.GetPassengerByEmailAsync(passengerEmail);
             if (passenger == null)
             {
-                Console.WriteLine("Passenger not found. Please enter your details to register.");
-                var name = ConsoleHelper.GetStringInput("Name: ");
-                var phone = ConsoleHelper.GetStringInput("Phone Number: ");
-
-                passenger = await _passengerService.GetOrRegisterPassengerAsync(passengerEmail, name, phone);
-                Console.WriteLine("Passenger registered successfully.");
+                throw new InvalidOperationException("Passenger not found. Please enter your details to register.");
             }
 
             if (!Enum.TryParse<FlightClass>(classInputStr, true, out var flightClass))
@@ -143,12 +138,7 @@ namespace AirportBooking.Services
             var passenger = await _passengerService.GetPassengerByEmailAsync(passengerEmail);
             if (passenger == null)
             {
-                ConsoleHelper.PrintInfo("Passenger not found. Please enter your details to register.");
-                var name = ConsoleHelper.GetStringInput("Name: ");
-                var phone = ConsoleHelper.GetStringInput("Phone Number: ");
-
-                passenger = await _passengerService.GetOrRegisterPassengerAsync(passengerEmail, name, phone);
-                ConsoleHelper.PrintSuccess("Passenger registered successfully.");
+                throw new InvalidOperationException("Passenger not found. Please register before booking a flight.");
             }
 
             var bookings = await GetBookingsByPassengerIdAsync(passenger.PassengerId);

@@ -168,7 +168,7 @@ class Program
         var passengerEmail = ConsoleHelper.GetStringInput("Enter your email: ");
         var flightId = ConsoleHelper.GetStringInput("Enter Flight ID to book: ");
         var classInputStr = ConsoleHelper.GetStringInput("Select Class (Economy, Business, FirstClass): ");
-         var seats = ConsoleHelper.GetIntInput("Number of seats to book: ", 1, int.MaxValue);
+        var seats = ConsoleHelper.GetIntInput("Number of seats to book: ", 1, int.MaxValue);
 
         try
         {
@@ -193,7 +193,7 @@ class Program
         }
     }
 
-   public static async Task ManageBookings()
+    private static async Task ManageBookings()
     {
         ConsoleHelper.PrintHeader("Manage Bookings");
 
@@ -215,13 +215,23 @@ class Program
                 Console.WriteLine($"{booking.BookingId}: Flight ID {booking.FlightId}, Seats: {booking.NumberOfSeats}");
             }
         }
-        catch (ArgumentException ex)
-        {
-            ConsoleHelper.PrintError($"Input Error: {ex.Message}");
-        }
         catch (InvalidOperationException ex)
         {
-            ConsoleHelper.PrintError($"Booking Error: {ex.Message}");
+            ConsoleHelper.PrintWarning($"{ex.Message}");
+            var choice = ConsoleHelper.GetStringInput("Do you want to register this passenger now? (y/n): ");
+            if (choice.Equals("y", StringComparison.OrdinalIgnoreCase))
+            {
+                var passengerName = ConsoleHelper.GetStringInput("Name: ");
+                var passengerPhone = ConsoleHelper.GetStringInput("Phone Number: ");
+
+                await _passengerService.GetOrRegisterPassengerAsync(passengerEmail, passengerName, passengerPhone);
+                ConsoleHelper.PrintSuccess("Passenger registered successfully.");
+                await ManageBookings();
+            }
+            else
+            {
+                ConsoleHelper.PrintInfo("Operation cancelled.");
+            }
         }
         catch (Exception ex)
         {
