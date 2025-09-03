@@ -166,84 +166,72 @@ class Program
         ConsoleHelper.PrintHeader("Book a Flight");
 
         var passengerEmail = ConsoleHelper.GetStringInput("Enter your email: ");
-        var passenger = await _passengerService.GetPassengerByEmailAsync(passengerEmail);
-
-        if (passenger == null)
-        {
-            ConsoleHelper.PrintInfo("Passenger not found. Please enter your details to register.");
-            var name = ConsoleHelper.GetStringInput("Name: ");
-            var phone = ConsoleHelper.GetStringInput("Phone Number: ");
-
-            passenger = await _passengerService.GetOrRegisterPassengerAsync(passengerEmail, name, phone);
-            ConsoleHelper.PrintSuccess("Passenger registered successfully.");
-        }
-
         var flightId = ConsoleHelper.GetStringInput("Enter Flight ID to book: ");
         var classInputStr = ConsoleHelper.GetStringInput("Select Class (Economy, Business, FirstClass): ");
-        if (!Enum.TryParse<FlightClass>(classInputStr, true, out var flightClass))
+         var seats = ConsoleHelper.GetIntInput("Number of seats to book: ", 1, int.MaxValue);
+
+        try
         {
-            ConsoleHelper.PrintError("Invalid class selected.");
-            ConsoleHelper.Pause();
-            return;
+            var booking = await _bookingService.CreateBookingAsync(passengerEmail, flightId, classInputStr, seats);
+            ConsoleHelper.PrintSuccess("Booking created successfully!");
         }
-
-        var seats = ConsoleHelper.GetIntInput("Number of seats to book: ", 1, int.MaxValue);
-
-        var result = await _bookingService.CreateBookingAsync(flightId, passenger.PassengerId, flightClass, seats);
-
-        if (result.Success)
-            ConsoleHelper.PrintSuccess(result.Message);
-        else
-            ConsoleHelper.PrintError(result.Message);
-
-        ConsoleHelper.Pause();
+        catch (ArgumentException ex)
+        {
+            ConsoleHelper.PrintError($"Input Error: {ex.Message}");
+        }
+        catch (InvalidOperationException ex)
+        {
+            ConsoleHelper.PrintError($"Booking Error: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            ConsoleHelper.PrintError($"An unexpected error occurred: {ex.Message}");
+        }
+        finally
+        {
+            ConsoleHelper.Pause();
+        }
     }
 
-    private static async Task ManageBookings()
+   public static async Task ManageBookings()
     {
         ConsoleHelper.PrintHeader("Manage Bookings");
 
         var passengerEmail = ConsoleHelper.GetStringInput("Enter your email: ");
 
-        Passenger? passenger;
         try
         {
-            passenger = await _passengerService.GetPassengerByEmailAsync(passengerEmail);
-            if (passenger == null)
-            {
-                ConsoleHelper.PrintInfo("Passenger not found. Please enter your details to register.");
-                var name = ConsoleHelper.GetStringInput("Name: ");
-                var phone = ConsoleHelper.GetStringInput("Phone Number: ");
+            var bookings = await _bookingService.ManageBookingsAsync(passengerEmail);
 
-                passenger = await _passengerService.GetOrRegisterPassengerAsync(passengerEmail, name, phone);
-                ConsoleHelper.PrintSuccess("Passenger registered successfully.");
+            if (!bookings.Any())
+            {
+                ConsoleHelper.PrintWarning("No bookings found.");
+                return;
             }
+
+            ConsoleHelper.PrintSuccess($"Found {bookings.Count()} bookings:");
+            foreach (var booking in bookings)
+            {
+                Console.WriteLine($"{booking.BookingId}: Flight ID {booking.FlightId}, Seats: {booking.NumberOfSeats}");
+            }
+        }
+        catch (ArgumentException ex)
+        {
+            ConsoleHelper.PrintError($"Input Error: {ex.Message}");
+        }
+        catch (InvalidOperationException ex)
+        {
+            ConsoleHelper.PrintError($"Booking Error: {ex.Message}");
         }
         catch (Exception ex)
         {
-            ConsoleHelper.PrintError($"Error: {ex.Message}");
-            ConsoleHelper.Pause();
-            return;
+            ConsoleHelper.PrintError($"An unexpected error occurred: {ex.Message}");
         }
-
-        var bookings = await _bookingService.GetBookingsByPassengerIdAsync(passenger.PassengerId);
-
-        if (!bookings.Any())
+        finally
         {
-            ConsoleHelper.PrintWarning("No bookings found.");
             ConsoleHelper.Pause();
-            return;
         }
-
-        ConsoleHelper.PrintSuccess($"Found {bookings.Count()} bookings:");
-        foreach (var booking in bookings)
-        {
-            Console.WriteLine($"{booking.BookingId}: {booking}");
-        }
-
-        ConsoleHelper.Pause();
     }
-
     private static async Task FilterBookings()
     {
         ConsoleHelper.PrintHeader("Filter Bookings");

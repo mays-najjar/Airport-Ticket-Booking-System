@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using AirportBooking.Models;
 using AirportBooking.Repositories;
+using AirportBooking.UI;
 
 namespace AirportBooking.Services
 {
@@ -65,41 +66,66 @@ namespace AirportBooking.Services
         }
 
 
-        public async Task<BookingResult> CreateBookingAsync(string flightId, string passengerId, FlightClass flightClass, int numberOfSeats)
+        public async Task<Booking> CreateBookingAsync(string passengerEmail, string flightId, string classInputStr, int numberOfSeats)
         {
-            if (numberOfSeats <= 0)
-                return new BookingResult { Success = false, Message = "Number of seats must be greater than zero" };
-            var flight = await _flightService.GetFlightByIdAsync(flightId);
-            var passenger = await _passengerService.GetPassengerByIdAsync(passengerId);
-            if (flight == null)
-                return new BookingResult { Success = false, Message = "Flight not found" };
+            var passenger = await _passengerService.GetPassengerByEmailAsync(passengerEmail);
             if (passenger == null)
-                return new BookingResult { Success = false, Message = "Passenger not found" };
+            {
+                Console.WriteLine("Passenger not found. Please enter your details to register.");
+                var name = ConsoleHelper.GetStringInput("Name: ");
+                var phone = ConsoleHelper.GetStringInput("Phone Number: ");
+
+                passenger = await _passengerService.GetOrRegisterPassengerAsync(passengerEmail, name, phone);
+                Console.WriteLine("Passenger registered successfully.");
+            }
+
+            if (!Enum.TryParse<FlightClass>(classInputStr, true, out var flightClass))
+            {
+                throw new ArgumentException("Invalid class selected.");
+            }
+
+            if (numberOfSeats <= 0)
+            {
+                throw new ArgumentException("Number of seats must be greater than zero.");
+            }
+            var flight = await _flightService.GetFlightByIdAsync(flightId);
+            if (flight == null)
+            {
+                throw new ArgumentException($"Flight with ID '{flightId}' not found.");
+            }
+
             if (!await _flightService.IsFlightAvailableAsync(flightId, numberOfSeats))
-                return new BookingResult { Success = false, Message = "Not enough seats available" };
+            {
+                throw new InvalidOperationException("Not enough seats available.");
+            }
+
             var totalPrice = flight.GetPriceForClass(flightClass) * numberOfSeats;
+
             var booking = new Booking
             {
                 FlightId = flightId,
-                PassengerId = passengerId,
+                PassengerId = passenger.PassengerId,
                 SelectedClass = flightClass,
                 NumberOfSeats = numberOfSeats,
                 TotalPrice = totalPrice
             };
+
             if (!await _flightService.ReserveSeatsAsync(flightId, numberOfSeats))
-                return new BookingResult { Success = false, Message = "Failed to reserve seats" };
+            {
+                throw new InvalidOperationException("Failed to reserve seats.");
+            }
+
             try
             {
                 await _bookingRepository.AddAsync(booking);
+                return booking;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 await _flightService.ReleaseSeatsAsync(flightId, numberOfSeats);
-                return new BookingResult { Success = false, Message = $"Failed to create booking: {ex.Message}" };
+                throw new InvalidOperationException("Failed to create booking due to an unexpected error. Seats have been released.");
             }
-            return new BookingResult { Success = true, Message = "Booking created successfully", Booking = booking };
         }
-
         public async Task<bool> CancelBookingAsync(string bookingId)
         {
             var booking = await GetBookingByIdAsync(bookingId);
@@ -110,6 +136,23 @@ namespace AirportBooking.Services
             await _bookingRepository.UpdateAsync(booking);
             await _flightService.ReleaseSeatsAsync(booking.FlightId, booking.NumberOfSeats);
             return true;
+        }
+
+        public async Task<IEnumerable<Booking>> ManageBookingsAsync(string passengerEmail)
+        {
+            var passenger = await _passengerService.GetPassengerByEmailAsync(passengerEmail);
+            if (passenger == null)
+            {
+                ConsoleHelper.PrintInfo("Passenger not found. Please enter your details to register.");
+                var name = ConsoleHelper.GetStringInput("Name: ");
+                var phone = ConsoleHelper.GetStringInput("Phone Number: ");
+
+                passenger = await _passengerService.GetOrRegisterPassengerAsync(passengerEmail, name, phone);
+                ConsoleHelper.PrintSuccess("Passenger registered successfully.");
+            }
+
+            var bookings = await GetBookingsByPassengerIdAsync(passenger.PassengerId);
+            return bookings;
         }
 
         public async Task<BookingResult> ModifyBookingAsync(string bookingId, FlightClass newClass, int newNumberOfSeats)
@@ -151,7 +194,5 @@ namespace AirportBooking.Services
 
             return new BookingResult { Success = true, Message = "Booking modified successfully", Booking = booking };
         }
-
-
     }
 }
