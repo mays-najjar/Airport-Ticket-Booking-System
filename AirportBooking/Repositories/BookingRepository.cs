@@ -5,26 +5,18 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using AirportBooking.Models;
+using AirportBooking.Services;
 
 namespace AirportBooking.Repositories
 {
     public class BookingRepository : IBookingRepository
     {
         private readonly string _filePath = "data/bookings.json";
+        private readonly FlightRepository _flightRepository;
 
-        private async Task<List<Booking>> ReadBookingsAsync()
+        public BookingRepository(FlightRepository flightRepository)
         {
-            if (!File.Exists(_filePath))
-                return new List<Booking>();
-
-            using var stream = File.OpenRead(_filePath);
-            return await JsonSerializer.DeserializeAsync<List<Booking>>(stream) ?? new List<Booking>();
-        }
-
-        private async Task WriteBookingsAsync(List<Booking> bookings)
-        {
-            using var stream = File.Create(_filePath);
-            await JsonSerializer.SerializeAsync(stream, bookings);
+            _flightRepository = flightRepository ?? throw new ArgumentNullException(nameof(flightRepository));
         }
 
         public async Task<IEnumerable<Booking>> GetAll()
@@ -85,14 +77,40 @@ namespace AirportBooking.Repositories
             decimal? maxPrice = null)
         {
             var bookings = await ReadBookingsAsync();
-            
-            return bookings.Where(b =>
-                (string.IsNullOrEmpty(flightId) || b.FlightId == flightId) &&
-                (string.IsNullOrEmpty(passengerId) || b.PassengerId == passengerId) &&
-                (!maxPrice.HasValue || b.TotalPrice <= maxPrice.Value) &&
-                (!flightClass.HasValue || b.SelectedClass == flightClass.Value) &&
-                !b.IsCancelled
-            );
+            var flights = await _flightRepository.GetAll(); 
+            var query = from b in bookings
+                        join f in flights on b.FlightId equals f.FlightId
+                        where !b.IsCancelled
+                              && (string.IsNullOrEmpty(flightId) || b.FlightId == flightId)
+                              && (string.IsNullOrEmpty(passengerId) || b.PassengerId == passengerId)
+                              && (!maxPrice.HasValue || b.TotalPrice <= maxPrice.Value)
+                              && (!flightClass.HasValue || b.SelectedClass == flightClass.Value)
+                              && (string.IsNullOrEmpty(departureCountry) || f.DepartureCountry.Contains(departureCountry, StringComparison.OrdinalIgnoreCase))
+                              && (string.IsNullOrEmpty(destinationCountry) || f.DestinationCountry.Contains(destinationCountry, StringComparison.OrdinalIgnoreCase))
+                              && (!departureDate.HasValue || f.DepartureDate.Date == departureDate.Value.Date)
+                              && (string.IsNullOrEmpty(departureAirport) || f.DepartureAirport.Contains(departureAirport, StringComparison.OrdinalIgnoreCase))
+                              && (string.IsNullOrEmpty(arrivalAirport) || f.ArrivalAirport.Contains(arrivalAirport, StringComparison.OrdinalIgnoreCase))
+                        select b;
+
+            return query.ToList();
         }
+
+
+        private async Task<List<Booking>> ReadBookingsAsync()
+        {
+            if (!File.Exists(_filePath))
+                throw new FileNotFoundException($"Booking file not found: {_filePath}");
+
+
+            using var stream = File.OpenRead(_filePath);
+            return await JsonSerializer.DeserializeAsync<List<Booking>>(stream) ?? new List<Booking>();
+        }
+
+        private async Task WriteBookingsAsync(List<Booking> bookings)
+        {
+            using var stream = File.Create(_filePath);
+            await JsonSerializer.SerializeAsync(stream, bookings);
+        }
+
     }
 }

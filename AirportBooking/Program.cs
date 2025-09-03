@@ -24,8 +24,8 @@ class Program
     private static void InitializeServices()
     {
         var flightRepository = new FlightRepository();
-        var passengerRepository = new PassengerRepository("passengers");
-        var bookingRepository = new BookingRepository();
+        var passengerRepository = new PassengerRepository();
+        var bookingRepository = new BookingRepository(flightRepository);
 
         _flightService = new FlightService(flightRepository);
         _passengerService = new PassengerService(passengerRepository);
@@ -160,50 +160,41 @@ class Program
         ConsoleHelper.Pause();
     }
 
+
     private static async Task BookFlight()
     {
         ConsoleHelper.PrintHeader("Book a Flight");
 
         var passengerEmail = ConsoleHelper.GetStringInput("Enter your email: ");
         var passenger = await _passengerService.GetPassengerByEmailAsync(passengerEmail);
+
         if (passenger == null)
         {
             ConsoleHelper.PrintInfo("Passenger not found. Please enter your details to register.");
             var name = ConsoleHelper.GetStringInput("Name: ");
             var phone = ConsoleHelper.GetStringInput("Phone Number: ");
-            passenger = new Passenger { FirstName = name, Email = passengerEmail, PhoneNumber = phone };
-            await _passengerService.AddPassengerAsync(passenger);
+
+            passenger = await _passengerService.GetOrRegisterPassengerAsync(passengerEmail, name, phone);
             ConsoleHelper.PrintSuccess("Passenger registered successfully.");
         }
 
         var flightId = ConsoleHelper.GetStringInput("Enter Flight ID to book: ");
-        var flight = await _flightService.GetFlightByIdAsync(flightId);
-        if (flight == null)
-        {
-            ConsoleHelper.PrintError("Flight not found.");
-            ConsoleHelper.Pause();
-            return;
-        }
-
-        var classInput = ConsoleHelper.GetStringInput("Select Class (Economy, Business, FirstClass): ");
-        if (!Enum.TryParse<FlightClass>(classInput, true, out var selectedClass))
+        var classInputStr = ConsoleHelper.GetStringInput("Select Class (Economy, Business, FirstClass): ");
+        if (!Enum.TryParse<FlightClass>(classInputStr, true, out var flightClass))
         {
             ConsoleHelper.PrintError("Invalid class selected.");
             ConsoleHelper.Pause();
             return;
         }
 
-        var seats = ConsoleHelper.GetIntInput("Number of seats to book: ", 1, flight.AvailableSeats);
+        var seats = ConsoleHelper.GetIntInput("Number of seats to book: ", 1, int.MaxValue);
 
-        var result = await _bookingService.CreateBookingAsync(flightId, passenger.PassengerId, selectedClass, seats);
+        var result = await _bookingService.CreateBookingAsync(flightId, passenger.PassengerId, flightClass, seats);
+
         if (result.Success)
-        {
             ConsoleHelper.PrintSuccess(result.Message);
-        }
         else
-        {
             ConsoleHelper.PrintError(result.Message);
-        }
 
         ConsoleHelper.Pause();
     }
@@ -213,18 +204,30 @@ class Program
         ConsoleHelper.PrintHeader("Manage Bookings");
 
         var passengerEmail = ConsoleHelper.GetStringInput("Enter your email: ");
-        var passenger = await _passengerService.GetPassengerByEmailAsync(passengerEmail);
-        if (passenger == null)
+
+        Passenger? passenger;
+        try
         {
-            ConsoleHelper.PrintInfo("Passenger not found. Please enter your details to register.");
-            var name = ConsoleHelper.GetStringInput("Name: ");
-            var phone = ConsoleHelper.GetStringInput("Phone Number: ");
-            passenger = new Passenger { FirstName = name, Email = passengerEmail, PhoneNumber = phone };
-            await _passengerService.AddPassengerAsync(passenger);
-            ConsoleHelper.PrintSuccess("Passenger registered successfully.");
+            passenger = await _passengerService.GetPassengerByEmailAsync(passengerEmail);
+            if (passenger == null)
+            {
+                ConsoleHelper.PrintInfo("Passenger not found. Please enter your details to register.");
+                var name = ConsoleHelper.GetStringInput("Name: ");
+                var phone = ConsoleHelper.GetStringInput("Phone Number: ");
+
+                passenger = await _passengerService.GetOrRegisterPassengerAsync(passengerEmail, name, phone);
+                ConsoleHelper.PrintSuccess("Passenger registered successfully.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ConsoleHelper.PrintError($"Error: {ex.Message}");
+            ConsoleHelper.Pause();
+            return;
         }
 
         var bookings = await _bookingService.GetBookingsByPassengerIdAsync(passenger.PassengerId);
+
         if (!bookings.Any())
         {
             ConsoleHelper.PrintWarning("No bookings found.");

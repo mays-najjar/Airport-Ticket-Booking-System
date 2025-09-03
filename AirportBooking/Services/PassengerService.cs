@@ -35,8 +35,13 @@ namespace AirportBooking.Services
             return await _passengerRepository.GetByPhoneAsync(phoneNumber);
         }
 
-        public async Task AddPassengerAsync(Passenger passenger)
+         public async Task AddPassengerAsync(Passenger passenger)
         {
+            if (string.IsNullOrWhiteSpace(passenger.Email))
+                throw new ArgumentException("Passenger email is required.");
+            if (string.IsNullOrWhiteSpace(passenger.FirstName))
+                throw new ArgumentException("Passenger name is required.");
+
             await _passengerRepository.AddAsync(passenger);
         }
 
@@ -45,10 +50,30 @@ namespace AirportBooking.Services
             await _passengerRepository.UpdateAsync(passenger);
         }
 
-
         public async Task DeletePassengerAsync(string id)
         {
             await _passengerRepository.DeleteAsync(id);
+        }
+
+        public async Task<Passenger> GetOrRegisterPassengerAsync(string email, string? name = null, string? phone = null)
+        {
+            var passenger = await _passengerRepository.GetByEmailAsync(email);
+            if (passenger != null)
+                return passenger;
+
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(phone))
+                throw new InvalidOperationException("Passenger not found and no details provided to register");
+
+            passenger = new Passenger
+            {
+                PassengerId = Guid.NewGuid().ToString(),
+                FirstName = name!,
+                Email = email,
+                PhoneNumber = phone!
+            };
+
+            await _passengerRepository.AddAsync(passenger);
+            return passenger;
         }
     }
 }

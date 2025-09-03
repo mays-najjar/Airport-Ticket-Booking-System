@@ -12,21 +12,6 @@ namespace AirportBooking.Repositories
     {
         private readonly string _filePath = "data/flights.json";
 
-        private async Task<List<Flight>> ReadFlightsAsync()
-        {
-            if (!File.Exists(_filePath))
-                return new List<Flight>();
-
-            using var stream = File.OpenRead(_filePath);
-            return await JsonSerializer.DeserializeAsync<List<Flight>>(stream) ?? new List<Flight>();
-        }
-
-        private async Task WriteFlightsAsync(List<Flight> flights)
-        {
-            using var stream = File.Create(_filePath);
-            await JsonSerializer.SerializeAsync(stream, flights);
-        }
-
         public async Task<IEnumerable<Flight>> GetAll()
         {
             return await ReadFlightsAsync();
@@ -77,7 +62,7 @@ namespace AirportBooking.Repositories
             FlightClass? flightClass = null)
         {
             var flights = await ReadFlightsAsync();
-            
+
             return flights.Where(f =>
                 (string.IsNullOrEmpty(departureCountry) || f.DepartureCountry.Contains(departureCountry, StringComparison.OrdinalIgnoreCase)) &&
                 (string.IsNullOrEmpty(destinationCountry) || f.DestinationCountry.Contains(destinationCountry, StringComparison.OrdinalIgnoreCase)) &&
@@ -114,6 +99,21 @@ namespace AirportBooking.Repositories
 
             flight.AvailableSeats += seats;
             await UpdateAsync(flight);
+        }
+        
+         private async Task<List<Flight>> ReadFlightsAsync()
+        {
+            if (!File.Exists(_filePath))
+                return new List<Flight>();
+
+            using var stream = File.OpenRead(_filePath);
+            return await JsonSerializer.DeserializeAsync<List<Flight>>(stream) ?? new List<Flight>();
+        }
+
+        private async Task WriteFlightsAsync(List<Flight> flights)
+        {
+            using var stream = File.Create(_filePath);
+            await JsonSerializer.SerializeAsync(stream, flights);
         }
     }
 }

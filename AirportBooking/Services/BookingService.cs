@@ -51,42 +51,33 @@ namespace AirportBooking.Services
             FlightClass? flightClass = null,
             decimal? maxPrice = null)
         {
-            var bookings = await _bookingRepository.GetAll();
-            var flights = await _flightService.GetAllFlightsAsync();
-
-            var query = from b in bookings
-                        join f in flights on b.FlightId equals f.FlightId
-                        where !b.IsCancelled
-                              && (string.IsNullOrEmpty(flightId) || b.FlightId == flightId)
-                              && (string.IsNullOrEmpty(passengerId) || b.PassengerId == passengerId)
-                              && (!maxPrice.HasValue || b.TotalPrice <= maxPrice.Value)
-                              && (string.IsNullOrEmpty(departureCountry) || f.DepartureCountry.Contains(departureCountry, StringComparison.OrdinalIgnoreCase))
-                              && (string.IsNullOrEmpty(destinationCountry) || f.DestinationCountry.Contains(destinationCountry, StringComparison.OrdinalIgnoreCase))
-                              && (!departureDate.HasValue || f.DepartureDate.Date == departureDate.Value.Date)
-                              && (string.IsNullOrEmpty(departureAirport) || f.DepartureAirport.Contains(departureAirport, StringComparison.OrdinalIgnoreCase))
-                              && (string.IsNullOrEmpty(arrivalAirport) || f.ArrivalAirport.Contains(arrivalAirport, StringComparison.OrdinalIgnoreCase))
-                              && (!flightClass.HasValue || b.SelectedClass == flightClass.Value)
-                        select b;
-
-            return query.ToList();
+            return await _bookingRepository.SearchBookingsAsync(
+            flightId,
+            passengerId,
+            departureCountry,
+            destinationCountry,
+            departureDate,
+            departureAirport,
+            arrivalAirport,
+            flightClass,
+            maxPrice
+        );
         }
+
 
         public async Task<BookingResult> CreateBookingAsync(string flightId, string passengerId, FlightClass flightClass, int numberOfSeats)
         {
+            if (numberOfSeats <= 0)
+                return new BookingResult { Success = false, Message = "Number of seats must be greater than zero" };
             var flight = await _flightService.GetFlightByIdAsync(flightId);
             var passenger = await _passengerService.GetPassengerByIdAsync(passengerId);
-
             if (flight == null)
                 return new BookingResult { Success = false, Message = "Flight not found" };
-
             if (passenger == null)
                 return new BookingResult { Success = false, Message = "Passenger not found" };
-
             if (!await _flightService.IsFlightAvailableAsync(flightId, numberOfSeats))
                 return new BookingResult { Success = false, Message = "Not enough seats available" };
-
             var totalPrice = flight.GetPriceForClass(flightClass) * numberOfSeats;
-
             var booking = new Booking
             {
                 FlightId = flightId,
@@ -95,11 +86,17 @@ namespace AirportBooking.Services
                 NumberOfSeats = numberOfSeats,
                 TotalPrice = totalPrice
             };
-
             if (!await _flightService.ReserveSeatsAsync(flightId, numberOfSeats))
                 return new BookingResult { Success = false, Message = "Failed to reserve seats" };
-
-            await _bookingRepository.AddAsync(booking);
+            try
+            {
+                await _bookingRepository.AddAsync(booking);
+            }
+            catch (Exception ex)
+            {
+                await _flightService.ReleaseSeatsAsync(flightId, numberOfSeats);
+                return new BookingResult { Success = false, Message = $"Failed to create booking: {ex.Message}" };
+            }
             return new BookingResult { Success = true, Message = "Booking created successfully", Booking = booking };
         }
 
