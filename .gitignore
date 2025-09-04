@@ -1,0 +1,8 @@
+bin/
+Data/
+obj/
+*.user
+*.suo
+*.log
+*.dll
+*.cache

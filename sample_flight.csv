@@ -1,0 +1,11 @@
+FlightNumber,DepartureCountry,DestinationCountry,DepartureDate,DepartureAirport,ArrivalAirport,Price,AvailableSeats
+AA101,USA,UK,2024-12-15 08:00,JFK,LHR,450.00,150
+BA202,UK,France,2024-12-16 14:30,LHR,CDG,320.00,200
+CA303,France,Germany,2024-12-17 09:15,CDG,FRA,280.00,180
+DA404,Germany,Italy,2024-12-18 11:45,FRA,FCO,350.00,120
+EA505,Italy,Spain,2024-12-19 16:20,FCO,MAD,290.00,160
+FA606,Spain,Portugal,2024-12-20 13:10,MAD,LIS,220.00,140
+GA707,Portugal,Netherlands,2024-12-21 07:30,LIS,AMS,310.00,170
+HA808,Netherlands,Belgium,2024-12-22 10:00,AMS,BRU,180.00,190
+IA909,Belgium,Switzerland,2024-12-23 15:45,BRU,ZRH,340.00,130
+JA010,Switzerland,Austria,2024-12-24 12:30,ZRH,VIE,260.00,150
