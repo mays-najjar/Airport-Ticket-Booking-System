@@ -3,6 +3,7 @@
 A console-based application to manage flights, passengers, and bookings. Users can search flights, book tickets, and manage reservations. Managers can filter bookings and upload flights in bulk via CSV.
 
 ---
+[![build and test](https://github.com/mays-najjar/Airport-Ticket-Booking-System/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/mays-najjar/Airport-Ticket-Booking-System/actions/workflows/build-and-test.yml)
 
 ## Features
 
